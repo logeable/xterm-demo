@@ -1,12 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"golang.org/x/text/encoding"
+	"io/ioutil"
 	"log"
 	"net/http"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/transform"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gobwas/ws"
@@ -18,19 +24,27 @@ var (
 	addr     string
 	username string
 	password string
+	termEnc encoding.Encoding
+	listenAddr string
 )
 
 func init() {
 	flag.StringVar(&addr, "addr", "localhost:22", "ssh server address")
 	flag.StringVar(&username, "u", "root", "username")
 	flag.StringVar(&password, "p", "", "password")
+	flag.StringVar(&listenAddr, "l", ":9930", "listen address")
+	enc := flag.String("enc", "", "term encoding: [gbk]")
 
 	flag.Parse()
+	if *enc == "gbk" {
+		termEnc = simplifiedchinese.GBK
+	}
+
 }
 
 func main() {
 	srv := &http.Server{
-		Addr:    ":9930",
+		Addr:    listenAddr,
 		Handler: configHandler(),
 	}
 
@@ -113,7 +127,16 @@ func wsHandler(ctx *gin.Context) {
 					return
 				}
 
-				data, err := json.Marshal([]string{"stdout", string(buf[:n])})
+				transformed := buf[:n]
+				if termEnc != nil {
+					transformed, err = transformToUtf8(buf[:n], termEnc)
+					if err != nil {
+						log.Println("encoding transform failed:", err)
+						return
+					}
+				}
+
+				data, err := json.Marshal([]string{"stdout", string(transformed)})
 				if err != nil {
 					log.Println("json marshal failed:", err)
 					return
@@ -138,7 +161,16 @@ func wsHandler(ctx *gin.Context) {
 					return
 				}
 
-				data, err := json.Marshal([]string{"stdout", string(buf[:n])})
+				transformed := buf[:n]
+				if termEnc != nil {
+					transformed, err = transformToUtf8(buf[:n], termEnc)
+					if err != nil {
+						log.Println("encoding transform failed:", err)
+						return
+					}
+				}
+
+				data, err := json.Marshal([]string{"stdout", string(transformed)})
 				if err != nil {
 					log.Println("json marshal failed:", err)
 					return
@@ -203,4 +235,13 @@ func sshConnect(addr, username, password string) (*ssh.Client, error) {
 		return nil, fmt.Errorf("ssh dial failed: %s", err)
 	}
 	return client, nil
+}
+
+func transformToUtf8(data []byte, enc encoding.Encoding) ([]byte, error) {
+	reader := transform.NewReader(bytes.NewReader(data), enc.NewDecoder())
+	bs, err := ioutil.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
+	return bs, nil
 }

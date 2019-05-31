@@ -26,7 +26,7 @@
 <div id="terminal" class="fullscreen"></div>
 
 <script>
-  var url = "ws://localhost:9930/ws";
+  var url = "ws://" + location.host + "/ws";
   var ws = new WebSocket(url)
   var term
 
