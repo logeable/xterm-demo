@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>XTERM-DEMO</title>
+  <link rel="stylesheet" href="xterm/xterm.css">
+
+  <script src="xterm/xterm.js"></script>
+  <script src="xterm/addons/terminado/terminado.js"></script>
+  <script src="xterm/addons/fit/fit.js"></script>
+  <script src="xterm/addons/webLinks/webLinks.js"></script>
+  <script src="xterm/addons/search/search.js"></script>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    html, body, .fullscreen {
+      height: 100%;
+      min-height: 100%;
+    }
+  </style>
+</head>
+<body>
+<div id="terminal" class="fullscreen"></div>
+
+<script>
+  var url = "ws://localhost:9930/ws";
+  var ws = new WebSocket(url)
+  var term
+
+  ws.onopen = function(event) {
+    console.log("connection established")
+
+    createTerm()
+  }
+
+  ws.onclose = function(event) {
+    console.error("connection closed: ", event)
+  }
+
+  function createTerm() {
+    Terminal.applyAddon(terminado);
+    Terminal.applyAddon(fit)
+    Terminal.applyAddon(webLinks)
+    Terminal.applyAddon(search)
+    term = new Terminal()
+    term.open(document.getElementById("terminal"))
+    term.terminadoAttach(ws)
+    term.fit()
+    term.webLinksInit()
+  }
+  
+  window.addEventListener("resize", function () {
+    term.fit()
+  })
+
+</script>
+</body>
+</html>
